@@ -130,3 +130,6 @@ dmypy.json
 
 # Jetbrains IDE stuff
 .idea/
+
+# Weird macos directory info file
+.DS_Store
