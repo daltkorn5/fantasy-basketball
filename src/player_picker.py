@@ -4,9 +4,10 @@
 The list of available players is first queried from a PostgreSQL database. Then for each player
 the counting statistics are normalized so that a "relative value" of each player can be determined.
 As of now, the relative value is equal to the sum of the normalized values of all the statistics,
-except for salary and turnovers are both subtracted from the total. We subtract turnovers because we want to
-minimize those as much as possible (effectively giving them a weight of -1), and we subtract salary because we
-want to value the players with a lower salary higher.
+except for turnovers which are subtracted from the total. We subtract turnovers because we want to
+minimize those as much as possible (effectively giving them a weight of -1). Games played is given a weight
+of 2 because we don't want players who played fewer games but had high per-game averages to be
+over-valued.
 
 The team is then chosen based on some position constraints, a 12-player limit, and a "salary cap,"
 and the chosen players are printed out at the end.
@@ -14,7 +15,22 @@ and the chosen players are printed out at the end.
 import src.query_tool as query_tool
 from mip import *
 
-non_counting_stats = ('player_name', 'position', 'team')
+NON_COUNTING_STATS = ('player_name', 'position', 'team')
+
+WEIGHTS = {
+    'games_played': 2.0,
+    'field_goal_percentage': 1.0,
+    'free_throw_percentage': 1.0,
+    'three_pointers': 1.0,
+    'points': 1.0,
+    'rebounds': 1.0,
+    'assists': 1.0,
+    'steals': 1.0,
+    'blocks': 1.0,
+    'turnovers': -1.0
+}
+
+SALARY_CAP = 14000000
 
 
 def get_players():
@@ -23,6 +39,7 @@ def get_players():
         player_name,
         position,
         p.team,
+        games_played,
         field_goal_percentage,
         free_throw_percentage,
         three_pointers,
@@ -57,10 +74,10 @@ def get_extrema(players):
             }
         }
     """
-    extrema = {k: {'min_val': 0.0, 'max_val': 0.0} for k in players[0].keys() if k not in non_counting_stats}
+    extrema = {k: {'min_val': 0.0, 'max_val': 0.0} for k in players[0].keys() if k not in NON_COUNTING_STATS}
     for player in players:
         for stat, value in player.items():
-            if stat in non_counting_stats:
+            if stat in NON_COUNTING_STATS:
                 continue
 
             if value < extrema[stat]['min_val']:
@@ -87,7 +104,7 @@ def normalize_stats(players):
     """Function to normalized all the counting statistics associated with each player.
 
     Salary is not normalized because we need the original salary values in order to meet our salary cap
-    constraint. So in addition to salary we include a new 'normalized_salary' field
+    constraint.
     :param players: The list of players whose stats are being normalized
 
     Does not return anything but modifies the player list
@@ -95,12 +112,10 @@ def normalize_stats(players):
     extrema = get_extrema(players)
     for player in players:
         for stat, value in player.items():
-            if stat in non_counting_stats or stat == 'salary':
+            if stat in NON_COUNTING_STATS or stat == 'salary':
                 continue
 
             player[stat] = normalize(value, **extrema[stat])
-
-        player['normalized_salary'] = normalize(player['salary'], **extrema['salary'])
 
 
 def get_relative_value(players):
@@ -118,12 +133,10 @@ def get_relative_value(players):
     for player in players:
         total = 0.0
         for stat, value in player.items():
-            if stat in non_counting_stats or stat == 'salary':
+            if stat in NON_COUNTING_STATS or stat == 'salary':
                 continue
-            elif stat in ('turnovers', 'normalized_salary'):
-                total -= value
             else:
-                total += value
+                total += value * WEIGHTS.get(stat, 0.0)
 
         player['relative_value'] = total
 
@@ -144,7 +157,7 @@ def pick_players(players):
     x = [m.add_var(var_type=BINARY) for _ in range(len(players))]
 
     # salary cap constraint
-    m += xsum(players[i]['salary'] * x[i] for i in range(len(players))) <= 140000000
+    m += xsum(players[i]['salary'] * x[i] for i in range(len(players))) <= SALARY_CAP
     # 12 players on the team constraint
     m += xsum(1 * x[i] for i in range(len(players))) == 12
 
@@ -182,7 +195,7 @@ def main():
     players = get_players()
     team_members = pick_players(players)
     for player in sorted(team_members, key=lambda p: p['relative_value'], reverse=True):
-        print(player)
+        print(f"{player['player_name']}, {player['position']}, {player['salary']}, {player['relative_value']}")
 
 
 if __name__ == '__main__':
