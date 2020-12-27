@@ -31,8 +31,11 @@ def scrape_stats(year):
         "team_id",  # team
         "g",  # games played
         "gs",  # games started
-        "fg_pct",  # field goal percentage
-        "ft_pct",  # free throw percentage
+        "mp",  # minutes played
+        "fg",  # field goals made
+        "fga",  # field goal attempts
+        "ft",  # free throws made
+        "fta",  # free throw attempts
         "fg3",  # three-pointers
         "pts",  # points
         "trb",  # total rebounds
@@ -42,9 +45,9 @@ def scrape_stats(year):
         "tov",  # turnovers
     )
 
-    headers = [th.getText().strip('%') for th in soup.findAll('tr', limit=2)[0].findAll('th', attrs={'data-stat': desired_fields})]
-    rows = soup.findAll('tr', {'class': 'full_table'})
-    player_stats = [[td.getText() for td in row.findAll('td', attrs={'data-stat': desired_fields})]
+    headers = [th.getText().strip('%') for th in soup.find_all('tr', limit=2)[0].find_all('th', attrs={'data-stat': desired_fields})]
+    rows = soup.find_all('tr', {'class': 'full_table'})
+    player_stats = [[td.getText() for td in row.find_all('td', attrs={'data-stat': desired_fields})]
                     for row in rows]
 
     return [fix_percentages(dict(zip(headers, player))) for player in player_stats]
@@ -85,8 +88,11 @@ def load_stats(stats):
         team, 
         games_played, 
         games_started, 
-        field_goal_percentage,
-        free_throw_percentage,
+        minutes_played,
+        field_goals,
+        field_goal_attempts,
+        free_throws,
+        free_throw_attempts,
         three_pointers,
         points,
         rebounds,
@@ -100,8 +106,11 @@ def load_stats(stats):
         %(Tm)s,
         %(G)s,
         %(GS)s,
+        %(MP)s,
         %(FG)s,
+        %(FGA)s,
         %(FT)s,
+        %(FTA)s,
         %(3P)s,
         %(PTS)s,
         %(TRB)s,
