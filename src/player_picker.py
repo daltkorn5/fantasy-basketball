@@ -18,7 +18,7 @@ from mip import *
 NON_COUNTING_STATS = ('player_name', 'position', 'team')
 
 WEIGHTS = {
-    'games_played': 2.0,
+    'games_played': 0.0,
     'field_goal_percentage': 1.0,
     'free_throw_percentage': 1.0,
     'three_pointers': 1.0,
@@ -30,7 +30,7 @@ WEIGHTS = {
     'turnovers': -1.0
 }
 
-SALARY_CAP = 14000000
+SALARY_CAP = 140000000
 
 
 def get_players():
@@ -40,8 +40,14 @@ def get_players():
         position,
         p.team,
         games_played,
-        field_goal_percentage,
-        free_throw_percentage,
+        case
+            when field_goal_attempts = 0 then 0.0
+            else (field_goals::real / field_goal_attempts::real)
+        end as field_goal_percentage,
+        case
+            when free_throw_attempts = 0 then 0.0
+            else (free_throws::real / free_throw_attempts::real)
+        end as free_throw_percentage,
         three_pointers,
         points,
         rebounds,
@@ -59,45 +65,50 @@ def get_players():
     return [dict(row) for row in query_tool.select(query)]
 
 
-def get_extrema(players):
-    """Function to get the maximum and minimum values of each counting statistic.
+def get_means_and_std_devs(players):
+    """Function to get the means and standard deviations of each counting statistic
     :param players: The list of players
-    :return: A dict with each statistic and its maximum and minimum values. For example:
+    :return: A dict with each statistic and its mean and standard deviation. For example:
         {
             'points': {
-                'min_val': 1.0,
-                'max_val': 2500.0
+                'mean': 1.0,
+                'std_dev': 2500.0
             },
             'rebounds': {
-                'min_val': 0.0,
-                'max_val': 1000.0
+                'mean': 0.0,
+                'std_dev': 1000.0
             }
         }
     """
-    extrema = {k: {'min_val': 0.0, 'max_val': 0.0} for k in players[0].keys() if k not in NON_COUNTING_STATS}
-    for player in players:
-        for stat, value in player.items():
-            if stat in NON_COUNTING_STATS:
-                continue
+    stats = players[0].keys()
 
-            if value < extrema[stat]['min_val']:
-                extrema[stat]['min_val'] = value
+    means_and_std_devs = {field: {'mean': 0.0, 'std_dev': 0.0}
+                          for field in stats if field not in NON_COUNTING_STATS}
+    for field in means_and_std_devs.keys():
+        # so for example this would be a list of every player's point total
+        whole_leagues_stat = [p[field] for p in players]
+        # we then calculate the league mean points scored
+        mean = sum(whole_leagues_stat) / len(whole_leagues_stat)
+        # and the variance
+        variance = sum([((x - mean) ** 2) for x in whole_leagues_stat]) / len(whole_leagues_stat)
+        std_dev = variance ** 0.5
 
-            if value > extrema[stat]['max_val']:
-                extrema[stat]['max_val'] = value
-    return extrema
+        means_and_std_devs[field]['mean'] = mean
+        means_and_std_devs[field]['std_dev'] = std_dev
+
+    return means_and_std_devs
 
 
-def normalize(value, min_val, max_val):
+def normalize(value, mean, std_dev):
     """Function to return the normalized value of a statistic.
     The normalized value is defined as:
         (x - x_min) / (x_max - x_min)
     :param value: The value being normalized
-    :param min_val: The minimum value of the corresponding statistic amongst all players
-    :param max_val: The maximum value of the corresponding statistic amongst all players
+    :param mean: The mean of the corresponding statistic amongst all players
+    :param std_dev: The standard_deviation of the corresponding statistic amongst all players
     :return: The normalized value
     """
-    return (value - min_val) / (max_val - min_val)
+    return (value - mean) / std_dev
 
 
 def normalize_stats(players):
@@ -109,13 +120,13 @@ def normalize_stats(players):
 
     Does not return anything but modifies the player list
     """
-    extrema = get_extrema(players)
+    means_and_std_devs = get_means_and_std_devs(players)
     for player in players:
         for stat, value in player.items():
             if stat in NON_COUNTING_STATS or stat == 'salary':
                 continue
 
-            player[stat] = normalize(value, **extrema[stat])
+            player[stat] = normalize(value, **means_and_std_devs[stat])
 
 
 def get_relative_value(players):
@@ -124,7 +135,7 @@ def get_relative_value(players):
     Relative value is defined as the sum of all the normalized counting statistics, except for
     turnovers and normalized_salary are subtracted from the total. In other words:
 
-    relative_value = points + three_pointers + ... + steals - turnovers - normalized_salary
+    relative_value = points + three_pointers + ... + steals - turnovers
     :param players: The list of players
 
     Does not return anything, but modifies the players list, adding a "relative_value" attribute
@@ -133,10 +144,11 @@ def get_relative_value(players):
     for player in players:
         total = 0.0
         for stat, value in player.items():
+            weight = WEIGHTS.get(stat, 0.0)
             if stat in NON_COUNTING_STATS or stat == 'salary':
                 continue
             else:
-                total += value * WEIGHTS.get(stat, 0.0)
+                total += value * weight
 
         player['relative_value'] = total
 
@@ -150,8 +162,6 @@ def pick_players(players):
     :param players: The list of players
     :return: Your fantasy basketball team!
     """
-    normalize_stats(players)
-    get_relative_value(players)
 
     m = Model(sense=MAXIMIZE)
     x = [m.add_var(var_type=BINARY) for _ in range(len(players))]
@@ -193,8 +203,17 @@ def pick_players(players):
 
 def main():
     players = get_players()
+    normalize_stats(players)
+    get_relative_value(players)
     team_members = pick_players(players)
+
+    print(f"Your total salary is: {sum(p['salary'] for p in team_members)}")
     for player in sorted(team_members, key=lambda p: p['relative_value'], reverse=True):
+        print(player)
+        # print(f"{player['player_name']}, {player['position']}, {player['salary']}, {player['relative_value']}")
+
+    print()
+    for player in sorted(players, key=lambda p: p['relative_value'], reverse=True)[:20]:
         print(f"{player['player_name']}, {player['position']}, {player['salary']}, {player['relative_value']}")
 
 
