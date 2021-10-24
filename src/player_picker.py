@@ -14,10 +14,6 @@ import src.query_tool as query_tool
 from mip import *
 
 NON_COUNTING_STATS = ('player_name', 'position', 'team')
-# We want to keep these separate so that we don't normalize them.
-# Their raw values will be used to compute the final value of their respective
-# percentage stats
-ATTEMPT_STATS = ('field_goal_attempts', 'free_throw_attempts')
 
 WEIGHTS = {
     'field_goal_percentage': 1.0,
@@ -35,20 +31,18 @@ SALARY_CAP = 140000000
 
 
 def get_players():
+    """Run a query to get the players list
+
+    :return: A list of dicts, where each dict corresponds to a single player
+    """
     query = """
     select
         player_name,
         position,
         p.team,
-        case
-            when field_goal_attempts = 0 then 0.0
-            else (field_goals::real / field_goal_attempts::real)
-        end as field_goal_percentage,
+        field_goals,
         field_goal_attempts,
-        case
-            when free_throw_attempts = 0 then 0.0
-            else (free_throws::real / free_throw_attempts::real)
-        end as free_throw_percentage,
+        free_throws,
         free_throw_attempts,
         three_pointers,
         points,
@@ -65,6 +59,90 @@ def get_players():
     ;
     """
     return [dict(row) for row in query_tool.select(query)]
+
+
+def get_average_percentage_stats():
+    """Run a query to get the team-level average percentage statistics
+
+    The sums of the fields are divided by 30 because there are 30 teams in the
+    NBA. So to get our average percentage statistic for the whole league we're looking
+    at the average makes/attempts per team
+
+    :return: A dict that contains the averages calculated in the query
+    """
+    query = """
+    with averages as (
+        select
+            sum(field_goals) / 30 as avg_field_goals,
+            sum(field_goal_attempts) / 30 as avg_field_goal_attempts,
+            sum(free_throws) / 30 as avg_free_throws,
+            sum(free_throw_attempts) / 30 as avg_free_throw_attempts
+        from
+            players
+    )
+    select
+        avg_field_goals,
+        avg_field_goal_attempts,
+        avg_field_goals::real / avg_field_goal_attempts::real as avg_field_goal_percentage,
+        avg_free_throws,
+        avg_free_throw_attempts,
+        avg_free_throws::real / avg_free_throw_attempts::real as avg_free_throw_percentage
+    from
+        averages
+    """
+    return [dict(row) for row in query_tool.select(query)][0]
+
+
+def percent_change(original, new):
+    """Function to get the percent change between two values
+
+    :param original: The original value
+    :param new: The new value
+    :return: The percent change between the new value and the original value
+    """
+    return (new - original) / abs(original)
+
+
+def calculate_percentage_impacts(players):
+    """Calculates the "impacts" each player has on percentage statistics.
+
+    The idea here is that first we get our per-team averages for, for example,
+    field goals, field goal attempts, and field goal percentage. Then for each player
+    we see how they would impact those per-team averages by adding their field goals to the
+    per-team field goal average, their field goal attempts to the per-team field goal attempts
+    average, getting that field goal new percentage, then calculating the percent change
+    from the per-team field goal percentage average.
+
+    This makes it so that a player who shoots 60% from the field  on 20 attempts per game
+    will have their field goal percentage count more towards the player's relative value
+    than a player who shoots 60% on 5 attempts per game.
+
+    :param players: The list of players
+    """
+    averages = get_average_percentage_stats()
+    for player in players:
+        field_goals = player['field_goals']
+        field_goal_attempts = player['field_goal_attempts']
+        adjusted_fg_percentage = (
+            (field_goals + averages["avg_field_goals"]) /
+            (field_goal_attempts + averages["avg_field_goal_attempts"])
+        )
+        fg_impact = percent_change(averages["avg_field_goal_percentage"], adjusted_fg_percentage)
+
+        player["field_goal_percentage"] = fg_impact
+
+        free_throws = player['free_throws']
+        free_throw_attempts = player['free_throw_attempts']
+        adjusted_ft_percentage = (
+            (free_throws + averages["avg_free_throws"]) /
+            (free_throw_attempts + averages["avg_free_throw_attempts"])
+        )
+        ft_impact = percent_change(averages["avg_free_throw_percentage"], adjusted_ft_percentage)
+
+        player["free_throw_percentage"] = ft_impact
+
+        # Don't need these anymore because our percentage impact values will be used from now on
+        [player.pop(key) for key in ("field_goals", "field_goal_attempts", "free_throws", "free_throw_attempts")]
 
 
 def get_means_and_std_devs(players, stats=None):
@@ -131,37 +209,10 @@ def normalize_stats(players):
     means_and_std_devs = get_means_and_std_devs(players)
     for player in players:
         for stat, value in player.items():
-            if stat in NON_COUNTING_STATS or stat == 'salary' or stat in ATTEMPT_STATS:
+            if stat in NON_COUNTING_STATS or stat == 'salary':
                 continue
 
             player[stat] = normalize(value, **means_and_std_devs[stat])
-
-
-def get_relative_value_for_percentage_stats(players):
-    """Function to get the relative value for the percentage stats (FG% and FT%).
-
-    The reason we can't just use a normal z-score for the percentage stats is because we want to
-    take the number of attempts into account. A player who makes 900/1000 free throws is worth more
-    to your team than one who makes 9/10. To account for that, we first calculate "unweighted" z-score
-    of the percentage fields, to see what the league average. We then "weight" that z-score by multiplying it
-    by the respective attempts field, then re-calculate the z-score of this product. The final value is then
-    multiplied by its weight and added to the player's relative value.
-
-    Please note that the setup for this function must be done prior to calling it. The players list passed
-    to this function should already have the percentage z-scores * attempts computed
-
-    :param players: The list of players. Again, they should already have their percentage z-score * attempts
-        applied
-
-    Does not return anything, but calculates the final z-scores of the percentage fields and adds them to the
-    player's relative value.
-    """
-    percentage_stats = ('free_throw_percentage', 'field_goal_percentage')
-    means_and_std_devs = get_means_and_std_devs(players, stats=percentage_stats)
-    for player in players:
-        for stat in percentage_stats:
-            player[stat] = normalize(player[stat], **means_and_std_devs[stat])
-            player['relative_value'] += player[stat] * WEIGHTS.get(stat, 0.0)
 
 
 def get_relative_value(players):
@@ -175,7 +226,7 @@ def get_relative_value(players):
     Does not return anything, but modifies the players list, adding a "relative_value" attribute
     to each player
     """
-    stats_to_skip = NON_COUNTING_STATS + ATTEMPT_STATS + ('salary', 'free_throw_percentage', 'field_goal_percentage')
+    stats_to_skip = NON_COUNTING_STATS + ('salary',)
     for player in players:
         total = 0.0
         for stat, value in player.items():
@@ -186,13 +237,6 @@ def get_relative_value(players):
                 total += value * weight
 
         player['relative_value'] = total
-
-        # Here we're setting up the process to weight the percentage statistics based on the volume of attempts
-        # associated with them
-        player['field_goal_percentage'] = player['field_goal_percentage'] * player['field_goal_attempts']
-        player['free_throw_percentage'] = player['free_throw_percentage'] * player['free_throw_attempts']
-
-    get_relative_value_for_percentage_stats(players)
 
 
 def pick_players(players):
@@ -245,6 +289,7 @@ def pick_players(players):
 
 def main():
     players = get_players()
+    calculate_percentage_impacts(players)
     normalize_stats(players)
     get_relative_value(players)
     team_members = pick_players(players)
