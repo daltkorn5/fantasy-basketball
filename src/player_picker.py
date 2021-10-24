@@ -10,6 +10,8 @@ minimize those as much as possible (effectively giving them a weight of -1).
 The team is then chosen based on some position constraints, a 12-player limit, and a "salary cap,"
 and the chosen players are printed out at the end.
 """
+from typing import Dict, Any, Union
+
 import src.query_tool as query_tool
 from mip import *
 
@@ -30,7 +32,7 @@ WEIGHTS = {
 SALARY_CAP = 140000000
 
 
-def get_players():
+def get_players() -> List[Dict[str, Any]]:
     """Run a query to get the players list
 
     :return: A list of dicts, where each dict corresponds to a single player
@@ -61,7 +63,7 @@ def get_players():
     return [dict(row) for row in query_tool.select(query)]
 
 
-def get_average_percentage_stats():
+def get_average_percentage_stats() -> Dict[str, Union[int, float]]:
     """Run a query to get the team-level average percentage statistics
 
     The sums of the fields are divided by 30 because there are 30 teams in the
@@ -93,7 +95,7 @@ def get_average_percentage_stats():
     return [dict(row) for row in query_tool.select(query)][0]
 
 
-def percent_change(original, new):
+def percent_change(original: Union[int, float], new: Union[int, float]) -> float:
     """Function to get the percent change between two values
 
     :param original: The original value
@@ -103,7 +105,7 @@ def percent_change(original, new):
     return (new - original) / abs(original)
 
 
-def calculate_percentage_impacts(players):
+def calculate_percentage_impacts(players: List[Dict[str, Any]]) -> None:
     """Calculates the "impacts" each player has on percentage statistics.
 
     The idea here is that first we get our per-team averages for, for example,
@@ -145,7 +147,7 @@ def calculate_percentage_impacts(players):
         [player.pop(key) for key in ("field_goals", "field_goal_attempts", "free_throws", "free_throw_attempts")]
 
 
-def get_means_and_std_devs(players, stats=None):
+def get_means_and_std_devs(players: List[Dict[str, Any]]) -> Dict[str, Dict]:
     """Function to get the means and standard deviations of each counting statistic
     :param players: The list of players
     :param stats: The list of stats for which you want to calculate the mean/std dev.
@@ -163,8 +165,7 @@ def get_means_and_std_devs(players, stats=None):
             }
         }
     """
-    if stats is None:
-        stats = players[0].keys()
+    stats = players[0].keys()
 
     means_and_std_devs = {field: {'mean': 0.0, 'std_dev': 0.0}
                           for field in stats if field not in NON_COUNTING_STATS}
@@ -183,7 +184,7 @@ def get_means_and_std_devs(players, stats=None):
     return means_and_std_devs
 
 
-def normalize(value, mean, std_dev):
+def normalize(value: Union[int, float], mean: float, std_dev: float) -> float:
     """Function to return the normalized value of a statistic.
 
     Here we are defining "normalized" as a z-score, calculated as:
@@ -197,7 +198,7 @@ def normalize(value, mean, std_dev):
     return (value - mean) / std_dev
 
 
-def normalize_stats(players):
+def normalize_stats(players: List[Dict[str, Any]]) -> None:
     """Function to normalized all the counting statistics associated with each player.
 
     Salary is not normalized because we need the original salary values in order to meet our salary cap
@@ -215,7 +216,7 @@ def normalize_stats(players):
             player[stat] = normalize(value, **means_and_std_devs[stat])
 
 
-def get_relative_value(players):
+def get_relative_value(players: List[Dict[str, Any]]) -> None:
     """Function to calculate the relative value of each player.
 
     Relative value is calculated as the sum of the z-scores of the stats multiplied by their respective weights,
@@ -239,7 +240,7 @@ def get_relative_value(players):
         player['relative_value'] = total
 
 
-def pick_players(players):
+def pick_players(players: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Function to determine which players you should pick for your fantasy basketball team!
 
     Sets up the optimization model with salary-cap, position, and team-size constraints and determines
