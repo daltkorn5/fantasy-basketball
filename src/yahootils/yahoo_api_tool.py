@@ -26,7 +26,7 @@ class YahooFantasyApiTool:
         )
         data = response.json().get("fantasy_content")
         if not data:
-            raise Exception(f"Unable to retrieve data from Yahoo because: {data}")
+            raise Exception(f"Unable to retrieve data from Yahoo because: {response.json()}")
         else:
             return data
 
@@ -121,13 +121,103 @@ class YahooFantasyApiTool:
 
         return teams, rosters
 
+    def _get_batch_of_players(self, players: List, nba_teams: List, start: int = 0) -> None:
+        """Get a batch of players from the Yahoo Fantasy API.
+
+        Add the batch to the players list and also add the players' teams to the nba_teams
+        list if that team isn't already in there
+
+        Apparently 25 players is the most you can get in a single request.
+
+        :param players: The list to which the players will be added
+        :param nba_teams: The list to which the NBA team will be added
+        :param start: The index in the list of all possible players where the request should start
+
+        """
+        # even if you want more than 25 players at a time you can't get more
+        endpoint = f"league/{self.game_id}.l.{self.LEAGUE_ID}/players;start={start};count=25"
+        data = self._make_request_to_yahoo(endpoint)
+
+        num_results = data["league"][1]["players"].pop("count")
+
+        for _, player_dict in data["league"][1]["players"].items():
+            # We need to merge all the dicts because they're not going to be the same
+            # for each player. For example, if a player is injured they have an extra
+            # dict with their injury status
+            player_data = {}
+            for entry in player_dict["player"][0]:
+                if type(entry) == dict:
+                    player_data.update(entry)
+
+            status = player_data.get("status")
+            if status == "NA":
+                continue
+
+            player_id = int(player_data["player_id"])
+            player_name = f"{player_data['name']['ascii_first']} {player_data['name']['ascii_last']}"
+
+            positions = player_data["display_position"].split(",")
+
+            team_id = int(player_data.get("editorial_team_key", "").split(".")[-1])
+            team_name = player_data.get("editorial_team_full_name")
+            team_code = player_data.get("editorial_team_abbr")
+
+            players.append({
+                "player_id": player_id,
+                "player_name": player_name,
+                "status": status,
+                "positions": positions,
+                "team_id": team_id
+            })
+
+            if team_id not in [team["team_id"] for team in nba_teams]:
+                nba_teams.append({
+                    "team_id": team_id,
+                    "team_name": team_name,
+                    "team_code": team_code
+                })
+
+        # If a full batch was returned that means there are more players to pull still
+        if num_results == 25:
+            self._get_batch_of_players(
+                players=players,
+                nba_teams=nba_teams,
+                start=start + 25
+            )
+
+    def get_players_and_nba_teams(self):
+        """Get all the players and their teams
+
+        :return: Two lists of dicts, one of the players and one of the NBA teams.
+            The players list looks like:
+                [
+                    {"player_id": 123, "player_name": Michael Jordan, "status": None, "positions": ["SG", "SF"], "team_id": 1},
+                    {"player_id": 456, "player_name": Scottie Pippen, "status": "INJ", "positions": ["SF", "PF"], "team_id": 1},
+                    {"player_id": 789, "player_name": Dennis Rodman, "status": "O", "positions": ["PF", "C"], "team_id": 1},
+                    ...
+                ]
+            And the NBA teams list looks like:
+                [
+                    {"team_id": 1, "team_name": "Chicago Bulls", "team_code": "CHI"},
+                    {"team_id": 2, "team_name": "Portland Trailblazers", "team_code": "POR"},
+                    {"team_id": 3, "team_name": "Detroit Pistons", "team_code": "DET"},
+                    ...
+                ]
+        """
+        players = []
+        nba_teams = []
+        self._get_batch_of_players(players, nba_teams)
+
+        return players, nba_teams
+
+
+    # def get_matchups(self, team_id):
+        # url: https://fantasysports.yahooapis.com/fantasy/v2/team/223.l.431.t.1/matchups
+
 
 def main():
     yahoo_tool = YahooFantasyApiTool()
-    teams, rosters = yahoo_tool.get_teams_and_rosters()
-    print(teams)
-    for player in rosters:
-        print(player)
+    yahoo_tool.get_players_and_nba_teams()
 
 # def main():
 #     oauth = OAuth2(None, None, from_file="../../oauth_keys.json")
