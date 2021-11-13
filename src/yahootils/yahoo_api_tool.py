@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Union, Any
 
 from yahoo_oauth import OAuth2
 
@@ -14,7 +14,7 @@ class YahooFantasyApiTool:
 
         self.game_id = self._get_game_id()
 
-    def _make_request_to_yahoo(self, endpoint: str) -> dict:
+    def _make_request_to_yahoo(self, endpoint: str) -> Dict[str, Any]:
         """Helper function for making get requests to the Yahoo Fantasy API
 
         :param endpoint: The endpoint from which you want to retrieve data
@@ -185,7 +185,7 @@ class YahooFantasyApiTool:
                 start=start + 25
             )
 
-    def get_players_and_nba_teams(self):
+    def get_players_and_nba_teams(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Get all the players and their teams
 
         :return: Two lists of dicts, one of the players and one of the NBA teams.
@@ -210,58 +210,46 @@ class YahooFantasyApiTool:
 
         return players, nba_teams
 
+    def get_match_ups(self, team_id: Union[str, int]) -> List[Dict[str, str]]:
+        """Get all the match ups for the specified team
 
-    # def get_matchups(self, team_id):
-        # url: https://fantasysports.yahooapis.com/fantasy/v2/team/223.l.431.t.1/matchups
+        :param team_id: The team whose match ups you want to get
+        :return: A list of dicts containing the data for the team's match ups. The team ID in each dict is the
+            *opposing* team ID
+            Looks like:
+            [
+                {
+                    "team_id": "1",
+                    "week_no": "1",
+                    "week_start": "2021-10-19",
+                    "week_end": "2021-10-24",
+                    "is_playoffs": "0"
+                },
+                ...
+            ]
 
+        """
+        data = self._make_request_to_yahoo(f"team/{self.game_id}.l.{self.LEAGUE_ID}.t.{team_id}/matchups")
+        match_ups = data["team"][1]["matchups"]
+        match_ups.pop("count")
 
-def main():
-    yahoo_tool = YahooFantasyApiTool()
-    yahoo_tool.get_players_and_nba_teams()
+        results = []
+        for _, match_up in match_ups.items():
+            match_up_data = match_up["matchup"]
+            week_no = match_up_data["week"]
+            week_start = match_up_data["week_start"]
+            week_end = match_up_data["week_end"]
+            is_playoffs = match_up_data["is_playoffs"]
+            # this is the opposing team ID since we'll only be getting the
+            # match ups for one team
+            team_id = match_up_data["0"]["teams"]["1"]["team"][0][1]["team_id"]
 
-# def main():
-#     oauth = OAuth2(None, None, from_file="../../oauth_keys.json")
-#     if not oauth.token_is_valid():
-#         oauth.refresh_access_token()
-#
-#     response = oauth.session.get(
-#         url=f"{YAHOO_API_URL}/game/nba",
-#         params={"format": "json"},
-#     )
-#     # "Game" here means like Fantasy Basketball, not an individual NBA game
-#     game_id = response.json()["fantasy_content"]["game"][0]["game_id"]
-#
-#     response = oauth.session.get(
-#         url=f"{YAHOO_API_URL}/league/{game_id}.l.{LEAGUE_ID}/teams",
-#         params={"format": "json"},
-#     )
-#     teams = response.json()["fantasy_content"]["league"][1]["teams"]
-#
-#     response = oauth.session.get(
-#         url=f"{YAHOO_API_URL}/league/{game_id}.l.{LEAGUE_ID}/players",
-#         params={"format": "json"}
-#     )
-#     players = response.json()["fantasy_content"]["league"][1]["players"]
-#     for i, player_struct in players.items():
-#         player = player_struct["player"][0]
-#         player_key = player[0]["player_key"]
-#
-#         response = oauth.session.get(
-#             # url=f"{YAHOO_API_URL}/league/{game_id}.l.{LEAGUE_ID}/players;player_keys={player_key}/stats",
-#             url=f"{YAHOO_API_URL}/player/{player_key}/stats",
-#             params={"format": "json"}
-#         )
-#         player_stats = response.json()["fantasy_content"]["player"][1]["player_stats"]
-#         break
-#
-#     response = oauth.session.get(
-#         url=f"{YAHOO_API_URL}/game/nba/stat_categories",
-#         params={"format": "json"}
-#     )
-#     stat_categories = response.json()["fantasy_content"]["game"][1]["stat_categories"]["stats"]
-#     for stat in stat_categories:
-#         print(stat["stat"]["stat_id"], stat["stat"]["name"])
+            results.append({
+                "team_id": team_id,
+                "week_no": week_no,
+                "week_start": week_start,
+                "week_end": week_end,
+                "is_playoffs": is_playoffs,
+            })
 
-
-if __name__ == "__main__":
-    main()
+        return results
