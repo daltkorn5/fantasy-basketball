@@ -135,5 +135,5 @@ dmypy.json
 .DS_Store
 
 # Don't want to load our credentials to github!
-oauth_keys.json
+src/yahootils/oauth_keys.json
 src/yahootils/secrets.json
