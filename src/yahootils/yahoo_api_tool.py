@@ -8,7 +8,7 @@ class YahooFantasyApiTool:
     LEAGUE_ID = "3890"
 
     def __init__(self):
-        self.oauth = OAuth2(None, None, from_file="oauth_keys.json")
+        self.oauth = OAuth2(None, None, from_file="yahootils/oauth_keys.json")
         if not self.oauth.token_is_valid():
             self.oauth.refresh_access_token()
 
