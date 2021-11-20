@@ -1,3 +1,4 @@
+import os
 from typing import List, Dict, Tuple, Union, Any
 
 from yahoo_oauth import OAuth2
@@ -8,7 +9,7 @@ class YahooFantasyApiTool:
     LEAGUE_ID = "3890"
 
     def __init__(self):
-        self.oauth = OAuth2(None, None, from_file="yahootils/oauth_keys.json")
+        self.oauth = OAuth2(None, None, from_file=f"{os.getenv('BBALL_HOME')}/src/yahootils/oauth_keys.json")
         if not self.oauth.token_is_valid():
             self.oauth.refresh_access_token()
 
