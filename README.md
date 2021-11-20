@@ -14,7 +14,7 @@ To initialize the database for the first time, you can run the following:
 ```shell
 make init-db
 ```
-This will create the seven tables you need, **and only needs to be run once**.
+This will create the tables and views for the db, **and only needs to be run once**.
 
 ## Drafting Players
 This section will contain info about how to use the code in here
