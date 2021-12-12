@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 
 import requests
 
+from src.utils.utils import sanitize_player_name
+
 
 class SpotracScraperTool:
     SPOTRAC_URL = "https://www.spotrac.com"
@@ -76,7 +78,7 @@ class SpotracScraperTool:
             salary_str = row.find("span", {"class": "info"}).text
             salary = self._convert_salary(salary_str)
             salaries.append({
-                "player_name": player_name,
+                "player_name": sanitize_player_name(player_name),
                 "salary": salary
             })
 
