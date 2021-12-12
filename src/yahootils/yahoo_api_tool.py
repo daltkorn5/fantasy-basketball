@@ -2,6 +2,7 @@ import os
 from typing import List, Dict, Tuple, Union, Any
 
 from yahoo_oauth import OAuth2
+from src.utils.utils import sanitize_player_name
 
 
 class YahooFantasyApiTool:
@@ -165,7 +166,7 @@ class YahooFantasyApiTool:
 
             players.append({
                 "player_id": player_id,
-                "player_name": player_name,
+                "player_name": sanitize_player_name(player_name),
                 "status": status,
                 "positions": positions,
                 "team_id": team_id

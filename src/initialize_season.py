@@ -1,8 +1,10 @@
 """This script should be run at the beginning of the Fantasy Basketball season"""
 from typing import List, Dict, Any
+from unidecode import unidecode
 
 from src.utils.bball_reference_scraper_tool import BasketballReferenceWebScraper
 from src.utils.query_tool import QueryTool
+from src.utils.spotrac_scraper_tool import SpotracScraperTool
 from src.yahootils.yahoo_api_tool import YahooFantasyApiTool
 
 
@@ -11,6 +13,7 @@ class FantasySeasonInitializer:
         self.query_tool = QueryTool()
         self.yahoo_api_tool = YahooFantasyApiTool()
         self.bball_reference_scraper = BasketballReferenceWebScraper()
+        self.spotrac_scraper = SpotracScraperTool()
 
     def _clean_database(self) -> None:
         """Clean the database at the beginning of a season
@@ -159,6 +162,7 @@ class FantasySeasonInitializer:
     def _load_schedule(self, schedule: List[Dict[str, Any]], team_id_map: Dict[str, int]) -> None:
         """Load the NBA schedule into the database
 
+        :param team_id_map: A map of team names to team IDs
         :param schedule: The NBA schedule scraped. Looks like:
             [
                 {
@@ -182,12 +186,72 @@ class FantasySeasonInitializer:
         )
         self.query_tool.insert(query, schedule)
 
+    def _get_player_id_map(self) -> Dict[str, int]:
+        """Create a map for player name to ID
+
+        Also includes any player "aliases" mapped to the correct ID.
+        For example, "Mo Bamba" vs "Mohamad Bamba"
+
+        :return: A map for player names to IDs. Looks like:
+            {
+                "Michael Jordan": 1,
+                "MJ": 1,
+                "Scottie Pippen": 2,
+                ...
+            }
+        """
+        player_id_map = {}
+
+        query = (
+            "WITH aliases AS ("
+            "SELECT player_id, player_name, UNNEST(player_aliases) as alias "
+            "FROM players) "
+            "SELECT player_id, players.player_name, alias "
+            "FROM players "
+            "LEFT JOIN aliases USING (player_id)"
+        )
+        results = self.query_tool.select(query)
+        for row in results:
+            player_name = row["player_name"]
+            player_id = row["player_id"]
+            player_id_map[player_name] = player_id
+
+            alias = row["alias"]
+            if alias:
+                player_id_map[alias] = player_id
+
+        return player_id_map
+
+    def _load_salaries(self, year: int) -> None:
+        """Get player salaries from Spotrac and update the players table accordingly
+
+        :param year: The year for which you want the salaries
+        """
+        print("Loading salaries into DB")
+        player_id_map = self._get_player_id_map()
+
+        salaries = self.spotrac_scraper.scrape_salaries(year)
+        missing_players = []
+        for row in salaries:
+            row["player_id"] = player_id_map.get(row["player_name"])
+            if row["player_id"] is None:
+                missing_players.append(row)
+
+        query = (
+            "UPDATE players SET salary = %(salary)s WHERE player_id = %(player_id)s;"
+        )
+        self.query_tool.insert(query, salaries)
+
+        print("These players are missing from the DB:")
+        for player in missing_players:
+            print(player["player_name"])
+
     def initialize_season(self) -> None:
         """Initialize the database for a new Fantasy Basketball season
 
         Initializing a season consists of cleaning the database, then uploading all the
-        data that we get from Yahoo. Lastly we upload the NBA schedule and player salaries from
-        Basketball Reference.
+        data that we get from Yahoo. Lastly we upload the NBA schedule from Basketball Reference
+        and the player salaries from Spotrac
 
         """
         self._clean_database()
@@ -207,7 +271,7 @@ class FantasySeasonInitializer:
         schedule = self.bball_reference_scraper.scrape_schedule(year)
         self._load_schedule(schedule, team_id_map)
 
-        # TODO need to load the salaries still
+        self._load_salaries(year)
 
 
 if __name__ == "__main__":
