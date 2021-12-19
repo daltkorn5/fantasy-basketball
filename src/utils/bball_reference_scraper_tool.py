@@ -3,6 +3,8 @@ from bs4 import BeautifulSoup
 from urllib.request import urlopen
 import datetime
 
+from src.utils.utils import sanitize_player_name
+
 
 class BasketballReferenceWebScraper:
     BASKETBALL_REFERENCE_URL = "https://www.basketball-reference.com"
@@ -83,7 +85,80 @@ class BasketballReferenceWebScraper:
 
         return schedule
 
+    @staticmethod
+    def _convert_minutes_played(minutes_played: str) -> float:
+        """Convert minutes played from a string to a float
+
+        :param minutes_played: Minutes played as a string. In the form MM:SS
+        :return: Minutes played as a float
+        """
+        minutes, seconds = minutes_played.split(":")
+        return round(int(minutes) + (int(seconds) / 60), 2)
+
+    def scrape_game_log(self, game_date: str, home_team: str, away_team: str) -> List[Dict[str, Any]]:
+        """Scrape the box score for a single NBA game
+
+        :param game_date: The date the game was played. In the form YYYYMMDD
+        :param home_team: The three letter code for the home team
+        :param away_team: The three letter code for the away team
+        :return: The box score of the desired game
+        """
+        html = self._get_parseable_html(f"boxscores/{game_date}0{home_team}.html")
+        tables: BeautifulSoup = html.find_all("table", {"class": "stats_table"})
+
+        # Basketball reference has many "stats_table" tables on its box score page,
+        # but these are the two that we want
+        home_team_box_score_table = f"box-{home_team}-game-basic"
+        away_team_box_score_table = f"box-{away_team}-game-basic"
+
+        desired_tables = [
+            table for table in tables if table.get("id") in (home_team_box_score_table, away_team_box_score_table)
+        ]
+
+        desired_fields = (
+            "fg",  # field goals made
+            "fga",  # field goal attempts
+            "ft",  # free throws made
+            "fta",  # free throw attempts
+            "fg3",  # three-pointers
+            "pts",  # points
+            "trb",  # total rebounds
+            "ast",  # assists
+            "stl",  # steals
+            "blk",  # blocks
+            "tov",  # turnovers
+        )
+
+        game_log = []
+        for table in desired_tables:
+            table_header: BeautifulSoup = table.find("thead")
+            header_row = table_header.find_all("tr", limit=2)[1]
+            headers = [th.text.lower() for th in header_row.find_all("th", attrs={"data-stat": desired_fields})]
+
+            table_body: BeautifulSoup = table.find("tbody")
+            rows = table_body.find_all("tr", class_=lambda x: x != "thead")
+            for row in rows:
+                # print(row)
+                player_name = row.find("th", attrs={"data-stat": "player"}).text
+
+                # This means the player didn't play
+                if row.find("td", attrs={"data-stat": "reason"}):
+                    continue
+
+                stats = [td.text for td in row.find_all("td", attrs={"data-stat": desired_fields})]
+                stats_dict = dict(zip(headers, stats))
+                # We'll get minutes played separately since we need to convert it into a float
+                minutes_played = row.find("td", attrs={"data-stat": "mp"}).text
+
+                stats_dict.update({
+                    "player": sanitize_player_name(player_name),
+                    "mp": self._convert_minutes_played(minutes_played)
+                })
+                game_log.append(stats_dict)
+
+        return game_log
+
 
 if __name__ == "__main__":
     scraper = BasketballReferenceWebScraper()
-    scraper.scrape_schedule(2022)
+    scraper.scrape_game_log("20211026", "OKC", "GSW")
