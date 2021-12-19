@@ -1,4 +1,6 @@
-from typing import List, Dict, Any
+import datetime
+import urllib
+from typing import List, Dict, Any, Union
 
 from src.utils.bball_reference_scraper_tool import BasketballReferenceWebScraper
 from src.utils.query_tool import QueryTool
@@ -224,10 +226,6 @@ class DataLoader:
 
     def load_salaries(self) -> None:
         """Get the player salaries from Spotrac and load them into the DB"""
-        """Get player salaries from Spotrac and update the players table accordingly
-
-                :param year: The year for which you want the salaries
-                """
         print("Loading salaries into DB")
         player_id_map = self._get_player_id_map()
         year = self._get_season_year()
@@ -248,7 +246,107 @@ class DataLoader:
         for player in missing_players:
             print(player["player_name"])
 
+    def _get_latest_loaded_game_log_date(self) -> datetime.date:
+        """Get the latest date in the game_log table for which there is data"""
+        query = "SELECT max(game_date) as latest_date from game_log;"
+        return self.query_tool.select(query)[0]["latest_date"]
 
-if __name__ == "__main__":
-    data_loader = DataLoader()
-    data_loader.load_salaries()
+    def _get_schedule(self, start_date: Union[str, datetime.date], team: str = None) -> List[Dict[str, str]]:
+        """Get the NBA schedule from the provided start date to today
+
+        :param start_date: The lower bound for the schedule select query
+        :param team: Optional parameter to specify which team's schedule you want
+        :return: The NBA schedule between start_date and today. Looks like:
+            [
+                {
+                    "game_date": 2021-11-01,
+                    "home_team": "CHI",
+                    "away_team": "POR",
+                },
+                ...
+            ]
+        """
+        team_clause = ""
+        if team:
+            team_clause = "AND (home_teams.team_code = %(team)s OR away_teams.team_code = %(team)s)"
+
+        # Note we had to change some of the team codes because Basketball Reference's don't match Yahoo's
+        query = (
+            "WITH modified_nba_teams as (SELECT nba_team_id, "
+            "CASE WHEN team_code = 'BKN' THEN 'BRK' "
+            "WHEN team_code = 'PHX' THEN 'PHO' "
+            "WHEN team_code = 'CHA' THEN 'CHO' "
+            "else team_code END AS team_code FROM nba_teams) "
+            "SELECT game_date, home_teams.team_code as home_team, away_teams.team_code as away_team "
+            "FROM nba_schedule "
+            "JOIN modified_nba_teams home_teams on (home_teams.nba_team_id = nba_schedule.home_team_id) "
+            "JOIN modified_nba_teams away_teams on (away_teams.nba_team_id = nba_schedule.away_team_id) "
+            f"WHERE game_date between %(start_date)s AND %(end_date)s {team_clause}"
+        )
+        params = {
+            "start_date": start_date,
+            "end_date": datetime.date.today() - datetime.timedelta(days=1),
+            "team": team
+        }
+        schedule = self.query_tool.select(query, params)
+        return schedule
+
+    def _get_game_logs(self, schedule: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+        """Get the game logs from Basketball Reference
+
+        :param schedule: The NBA schedule
+        :return: The game logs for each game in the provided schedule
+        """
+        game_logs = []
+        for row in schedule:
+            print(f"Getting game log for {row}")
+            try:
+                game_log = self.bball_reference_scraper.scrape_game_log(**row)
+            except urllib.error.HTTPError:
+                print(f"Game for {row} not found")
+                continue
+
+            game_logs.extend(game_log)
+
+        return game_logs
+
+    def load_game_logs(self, start_date: str = None, team: str = None) -> None:
+        """Get the game log data from Basketball Reference and load it into the DB
+
+        :param start_date: Optional start date for loading the game logs. If not supplied,
+            defaults to the latest date in the `game_log` table
+        :param team: Optional team whose game logs you want
+        """
+        if start_date is None:
+            start_date = self._get_latest_loaded_game_log_date()
+
+        print(f"Loading game logs from {start_date} to today into DB")
+        schedule = self._get_schedule(start_date, team)
+        game_logs = self._get_game_logs(schedule)
+
+        player_id_map = self._get_player_id_map()
+        missing_players = set()
+        upload = []
+        for row in game_logs:
+            row["player_id"] = player_id_map.get(row["player_name"])
+            if row["player_id"] is None:
+                missing_players.add(row["player_name"])
+            else:
+                upload.append(row)
+
+        print("These players are missing from the DB:")
+        for player in missing_players:
+            print(player)
+
+        query = (
+            "INSERT INTO game_log(player_id, game_date, minutes_played, field_goals, field_goal_attempts, "
+            "free_throws, free_throw_attempts, three_pointers, points, rebounds, assists, steals, blocks, "
+            "turnovers) VALUES (%(player_id)s, %(game_date)s, %(mp)s, %(fg)s, %(fga)s, %(ft)s, %(fta)s, %(3p)s, "
+            "%(pts)s, %(trb)s, %(ast)s, %(stl)s, %(blk)s, %(tov)s) "
+            "ON CONFLICT(player_id, game_date) DO UPDATE SET "
+            "minutes_played = %(mp)s, field_goals = %(fg)s, field_goal_attempts = %(fga)s, "
+            "free_throws = %(ft)s, free_throw_attempts = %(fta)s, three_pointers = %(3p)s, "
+            "points = %(pts)s, rebounds = %(trb)s, assists = %(ast)s, steals = %(stl)s, blocks = %(blk)s, "
+            "turnovers = %(tov)s"
+        )
+        self.query_tool.insert(query, upload)
