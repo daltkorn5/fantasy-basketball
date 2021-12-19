@@ -95,7 +95,7 @@ class BasketballReferenceWebScraper:
         minutes, seconds = minutes_played.split(":")
         return round(int(minutes) + (int(seconds) / 60), 2)
 
-    def scrape_game_log(self, game_date: str, home_team: str, away_team: str) -> List[Dict[str, Any]]:
+    def scrape_game_log(self, game_date: datetime.date, home_team: str, away_team: str) -> List[Dict[str, Any]]:
         """Scrape the box score for a single NBA game
 
         :param game_date: The date the game was played. In the form YYYYMMDD
@@ -103,7 +103,8 @@ class BasketballReferenceWebScraper:
         :param away_team: The three letter code for the away team
         :return: The box score of the desired game
         """
-        html = self._get_parseable_html(f"boxscores/{game_date}0{home_team}.html")
+        game_date_str = game_date.strftime("%Y%m%d")
+        html = self._get_parseable_html(f"boxscores/{game_date_str}0{home_team}.html")
         tables: BeautifulSoup = html.find_all("table", {"class": "stats_table"})
 
         # Basketball reference has many "stats_table" tables on its box score page,
@@ -138,7 +139,6 @@ class BasketballReferenceWebScraper:
             table_body: BeautifulSoup = table.find("tbody")
             rows = table_body.find_all("tr", class_=lambda x: x != "thead")
             for row in rows:
-                # print(row)
                 player_name = row.find("th", attrs={"data-stat": "player"}).text
 
                 # This means the player didn't play
@@ -151,14 +151,10 @@ class BasketballReferenceWebScraper:
                 minutes_played = row.find("td", attrs={"data-stat": "mp"}).text
 
                 stats_dict.update({
-                    "player": sanitize_player_name(player_name),
-                    "mp": self._convert_minutes_played(minutes_played)
+                    "player_name": sanitize_player_name(player_name),
+                    "mp": self._convert_minutes_played(minutes_played),
+                    "game_date": game_date
                 })
                 game_log.append(stats_dict)
 
         return game_log
-
-
-if __name__ == "__main__":
-    scraper = BasketballReferenceWebScraper()
-    scraper.scrape_game_log("20211026", "OKC", "GSW")

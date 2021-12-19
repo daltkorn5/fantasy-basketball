@@ -15,6 +15,6 @@ def sanitize_player_name(player_name: str) -> str:
     :return: The player name modified as described above
     """
     ascii_characters = unidecode(player_name)
-    without_suffixes = re.sub(r"( Jr\.| Jr| III| II)", "", ascii_characters)
-    without_dots = without_suffixes.replace(".", "")
-    return without_dots
+    without_dots = ascii_characters.replace(".", "")
+    without_suffixes = re.sub(r"( Jr| IV| III| II| Sr)", "", without_dots)
+    return without_suffixes
