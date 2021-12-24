@@ -98,7 +98,7 @@ class BasketballReferenceWebScraper:
     def scrape_game_log(self, game_date: datetime.date, home_team: str, away_team: str) -> List[Dict[str, Any]]:
         """Scrape the box score for a single NBA game
 
-        :param game_date: The date the game was played. In the form YYYYMMDD
+        :param game_date: The date the game was played
         :param home_team: The three letter code for the home team
         :param away_team: The three letter code for the away team
         :return: The box score of the desired game
