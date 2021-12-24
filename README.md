@@ -1,6 +1,6 @@
 # Fantasy Basketball
 This repo contains some stuff to help me pick players for my fantasy basketball team.
-It gets data from the Yahoo Fantasy Sports API and from scraping Basketball Reference,
+It gets data from the Yahoo Fantasy Sports API and from scraping Basketball Reference and Spotrac,
 and stores those data in a PostgreSQL database.
 
 ## Setup
@@ -25,7 +25,19 @@ At the beginning of the season, after the draft, you can run
 ```shell
 make init-season
 ```
-This will get all the data from Yahoo and Basketball Reference
-that you need in order to help you have a better-informed draft.
-It loads the Yahoo Fantasy teams, rosters, match-ups, players, 
+This will load the Yahoo Fantasy teams, rosters, match-ups, players, 
 NBA teams, and schedule into the database
+
+## Mid Season
+### Update Database
+In the middle of the season, to update the database, you can
+run:
+```shell
+make update-season
+```
+This will:
+* Update the players table, adding any new players and updating their statuses
+* Reload the player salaries
+* Update the fantasy teams (in case someone changed their team name)
+* Reload the fantasy team rosters
+* Upload any new game logs
