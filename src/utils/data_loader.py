@@ -78,7 +78,9 @@ class DataLoader:
         print("Loading teams into DB")
         query = (
             "INSERT INTO teams(team_id, team_name, manager) VALUES"
-            "(%(team_id)s, %(team_name)s, %(manager)s);"
+            "(%(team_id)s, %(team_name)s, %(manager)s) "
+            "ON CONFLICT (team_id) DO UPDATE "
+            "SET team_name = %(team_name)s, manager = %(manager)s;"
         )
         self.query_tool.insert(query, teams)
 
