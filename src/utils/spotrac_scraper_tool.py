@@ -7,6 +7,11 @@ import requests
 
 from src.utils.utils import sanitize_player_name
 
+import logging
+
+
+logging.getLogger("chardet.charsetprober").setLevel(logging.INFO)
+
 
 class SpotracScraperTool:
     SPOTRAC_URL = "https://www.spotrac.com"

@@ -4,6 +4,11 @@ from typing import List, Dict, Tuple, Union, Any
 from yahoo_oauth import OAuth2
 from src.utils.utils import sanitize_player_name
 
+import logging
+
+
+logging.getLogger("yahoo_oauth").setLevel(logging.INFO)
+
 
 class YahooFantasyApiTool:
     YAHOO_API_URL = "https://fantasysports.yahooapis.com/fantasy/v2"
