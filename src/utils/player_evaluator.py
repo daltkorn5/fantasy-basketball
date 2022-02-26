@@ -11,7 +11,7 @@ class PlayerEvaluator:
     then summing those values.
     """
 
-    NON_COUNTING_STATS = ("player_name", "positions", "team_code", "status", "fantasy_team", "salary")
+    NON_COUNTING_STATS = ("player_name", "positions", "team_code", "status", "fantasy_team", "salary", "manager")
 
     WEIGHTS = {
         'field_goal_percentage': 1.0,
@@ -56,14 +56,15 @@ class PlayerEvaluator:
             "SUM(free_throws) as free_throws, SUM(free_throw_attempts) as free_throw_attempts, "
             "SUM(three_pointers) AS three_pointers, SUM(points) AS points, "
             "SUM(rebounds) as rebounds, SUM(assists) AS assists, SUM(steals) as steals, "
-            "SUM(blocks) as blocks, SUM(turnovers) as turonovers, fantasy_teams.team_name AS fantasy_team "
+            "SUM(blocks) as blocks, SUM(turnovers) as turonovers, fantasy_teams.team_name AS fantasy_team, "
+            "fantasy_teams.manager "
             "FROM players "
             "JOIN game_log USING (player_id) "
             "JOIN nba_teams USING (nba_team_id) "
             "LEFT JOIN rosters USING (player_id) "
             "LEFT JOIN teams AS fantasy_teams USING (team_id)"
             f"{where_clause}"
-            "GROUP BY player_name, team_code, positions, status, salary, fantasy_team;"
+            "GROUP BY player_name, team_code, positions, status, salary, fantasy_team, manager;"
         )
         return self.query_tool.select(query)
 
@@ -87,14 +88,15 @@ class PlayerEvaluator:
             "AVG(free_throws) as free_throws, AVG(free_throw_attempts) as free_throw_attempts, "
             "AVG(three_pointers) AS three_pointers, AVG(points) AS points, "
             "AVG(rebounds) as rebounds, AVG(assists) AS assists, AVG(steals) as steals, "
-            "AVG(blocks) as blocks, AVG(turnovers) as turonovers, fantasy_teams.team_name AS fantasy_team "
+            "AVG(blocks) as blocks, AVG(turnovers) as turonovers, fantasy_teams.team_name AS fantasy_team, "
+            "fantasy_teams.manager "
             "FROM players "
             "JOIN game_log USING (player_id) "
             "JOIN nba_teams USING (nba_team_id) "
             "LEFT JOIN rosters USING (player_id) "
             "LEFT JOIN teams AS fantasy_teams USING (team_id)"
             f"{where_clause}"
-            "GROUP BY player_name, team_code, positions, status, salary, fantasy_team;"
+            "GROUP BY player_name, team_code, positions, status, salary, fantasy_team, manager;"
         )
         return self.query_tool.select(query)
 
