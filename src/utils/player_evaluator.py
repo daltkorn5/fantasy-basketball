@@ -25,8 +25,6 @@ class PlayerEvaluator:
         'turnovers': -1.0
     }
 
-    SALARY_CAP = 140_000_000
-
     def __init__(self, weights: Dict[str, float] = None):
         """Instantiate a PlayerEvaluator
 
@@ -51,12 +49,12 @@ class PlayerEvaluator:
         if start_date and end_date:
             where_clause = f" WHERE game_log.game_date BETWEEN '{start_date}'::DATE AND '{end_date}'::DATE "
         query = (
-            "SELECT player_name, team_code, ARRAY_TO_STRING(positions, ',') as positions, status, salary, "
+            "SELECT player_name, team_code, ARRAY_TO_STRING(positions, ',') as positions, status, COALESCE(salary, 0) as salary, "
             "SUM(field_goals) AS field_goals, SUM(field_goal_attempts) AS field_goal_attempts, "
             "SUM(free_throws) as free_throws, SUM(free_throw_attempts) as free_throw_attempts, "
             "SUM(three_pointers) AS three_pointers, SUM(points) AS points, "
             "SUM(rebounds) as rebounds, SUM(assists) AS assists, SUM(steals) as steals, "
-            "SUM(blocks) as blocks, SUM(turnovers) as turonovers, fantasy_teams.team_name AS fantasy_team, "
+            "SUM(blocks) as blocks, SUM(turnovers) as turnovers, fantasy_teams.team_name AS fantasy_team, "
             "fantasy_teams.manager "
             "FROM players "
             "JOIN game_log USING (player_id) "
@@ -83,12 +81,12 @@ class PlayerEvaluator:
         if start_date and end_date:
             where_clause = f" WHERE game_log.game_date BETWEEN '{start_date}'::DATE AND '{end_date}'::DATE "
         query = (
-            "SELECT player_name, team_code, ARRAY_TO_STRING(positions, ',') as positions, status, salary, "
+            "SELECT player_name, team_code, ARRAY_TO_STRING(positions, ',') as positions, status, COALESCE(salary, 0) as salary, "
             "AVG(field_goals) AS field_goals, AVG(field_goal_attempts) AS field_goal_attempts, "
             "AVG(free_throws) as free_throws, AVG(free_throw_attempts) as free_throw_attempts, "
             "AVG(three_pointers) AS three_pointers, AVG(points) AS points, "
             "AVG(rebounds) as rebounds, AVG(assists) AS assists, AVG(steals) as steals, "
-            "AVG(blocks) as blocks, AVG(turnovers) as turonovers, fantasy_teams.team_name AS fantasy_team, "
+            "AVG(blocks) as blocks, AVG(turnovers) as turnovers, fantasy_teams.team_name AS fantasy_team, "
             "fantasy_teams.manager "
             "FROM players "
             "JOIN game_log USING (player_id) "

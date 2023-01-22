@@ -12,7 +12,7 @@ logging.getLogger("yahoo_oauth").setLevel(logging.INFO)
 
 class YahooFantasyApiTool:
     YAHOO_API_URL = "https://fantasysports.yahooapis.com/fantasy/v2"
-    LEAGUE_ID = "3890"
+    LEAGUE_ID = "29232"
 
     def __init__(self):
         self.oauth = OAuth2(None, None, from_file=f"{os.getenv('BBALL_HOME')}/src/yahootils/oauth_keys.json")
@@ -180,7 +180,7 @@ class YahooFantasyApiTool:
             if team_id not in [team["team_id"] for team in nba_teams]:
                 nba_teams.append({
                     "team_id": team_id,
-                    "team_name": team_name,
+                    "team_name": team_name.replace("LA Clippers", "Los Angeles Clippers"),
                     "team_code": team_code
                 })
 

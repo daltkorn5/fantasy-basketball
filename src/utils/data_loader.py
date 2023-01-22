@@ -1,6 +1,9 @@
 import datetime
+import time
 import urllib
 from typing import List, Dict, Any, Union
+
+import requests
 
 from src.utils.bball_reference_scraper_tool import BasketballReferenceWebScraper
 from src.utils.query_tool import QueryTool
@@ -304,7 +307,8 @@ class DataLoader:
             print(f"Getting game log for {row}")
             try:
                 game_log = self.bball_reference_scraper.scrape_game_log(**row)
-            except urllib.error.HTTPError:
+                time.sleep(5)
+            except requests.exceptions.ConnectionError:
                 print(f"Game for {row} not found")
                 continue
 

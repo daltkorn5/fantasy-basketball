@@ -1,6 +1,8 @@
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
+import time
+import requests
 import datetime
 
 from src.utils.utils import sanitize_player_name
@@ -16,7 +18,9 @@ class BasketballReferenceWebScraper:
         :return: A BeautifulSoup object for parsing the HTML for the page you specified
         """
         full_url = f"{self.BASKETBALL_REFERENCE_URL}/{url}"
-        html = urlopen(full_url)
+        html = requests.get(
+            full_url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36"}
+        ).content.decode("utf-8")
         return BeautifulSoup(html, features="lxml")
 
     def _scrape_schedule_for_month(self, month: str, year: int) -> List[Dict[str, Any]]:
@@ -78,10 +82,12 @@ class BasketballReferenceWebScraper:
                 ...
             ]
         """
+        print(f"Getting NBA schedule for {year}")
         months = ("october", "november", "december", "january", "february", "march", "april")
         schedule = []
         for month in months:
             schedule.extend(self._scrape_schedule_for_month(month, year))
+            time.sleep(10)
 
         return schedule
 
@@ -158,3 +164,8 @@ class BasketballReferenceWebScraper:
                 game_log.append(stats_dict)
 
         return game_log
+
+
+if __name__ == "__main__":
+    scraper = BasketballReferenceWebScraper()
+    scraper.scrape_schedule(2023)
