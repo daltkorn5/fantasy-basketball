@@ -11,7 +11,16 @@ class PlayerEvaluator:
     then summing those values.
     """
 
-    NON_COUNTING_STATS = ("player_name", "positions", "team_code", "status", "fantasy_team", "salary", "manager")
+    NON_COUNTING_STATS = (
+        "player_name",
+        "positions",
+        "team_code",
+        "status",
+        "fantasy_team",
+        "salary",
+        "manager",
+        "minutes_per_game"
+    )
 
     WEIGHTS = {
         'field_goal_percentage': 1.0,
@@ -49,7 +58,8 @@ class PlayerEvaluator:
         if start_date and end_date:
             where_clause = f" WHERE game_log.game_date BETWEEN '{start_date}'::DATE AND '{end_date}'::DATE "
         query = (
-            "SELECT player_name, team_code, ARRAY_TO_STRING(positions, ',') as positions, status, COALESCE(salary, 0) as salary, "
+            "SELECT player_name, team_code, ARRAY_TO_STRING(positions, ',') as positions, status, "
+            "AVG(minutes_played) as minutes_per_game, COALESCE(salary, 0) as salary, "
             "SUM(field_goals) AS field_goals, SUM(field_goal_attempts) AS field_goal_attempts, "
             "SUM(free_throws) as free_throws, SUM(free_throw_attempts) as free_throw_attempts, "
             "SUM(three_pointers) AS three_pointers, SUM(points) AS points, "
@@ -81,7 +91,8 @@ class PlayerEvaluator:
         if start_date and end_date:
             where_clause = f" WHERE game_log.game_date BETWEEN '{start_date}'::DATE AND '{end_date}'::DATE "
         query = (
-            "SELECT player_name, team_code, ARRAY_TO_STRING(positions, ',') as positions, status, COALESCE(salary, 0) as salary, "
+            "SELECT player_name, team_code, ARRAY_TO_STRING(positions, ',') as positions, status, "
+            "AVG(minutes_played) as minutes_per_game, COALESCE(salary, 0) as salary, "
             "AVG(field_goals) AS field_goals, AVG(field_goal_attempts) AS field_goal_attempts, "
             "AVG(free_throws) as free_throws, AVG(free_throw_attempts) as free_throw_attempts, "
             "AVG(three_pointers) AS three_pointers, AVG(points) AS points, "
