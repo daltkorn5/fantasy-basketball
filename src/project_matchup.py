@@ -1,8 +1,6 @@
 from typing import List, Dict, Any, Optional
 
-from pandas import DataFrame
 import datetime
-import pandas as pd
 
 from src.utils.query_tool import QueryTool
 

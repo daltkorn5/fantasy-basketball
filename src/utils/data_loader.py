@@ -1,6 +1,5 @@
 import datetime
 import time
-import urllib
 from typing import List, Dict, Any, Union
 
 import requests
@@ -254,7 +253,8 @@ class DataLoader:
     def _get_latest_loaded_game_log_date(self) -> datetime.date:
         """Get the latest date in the game_log table for which there is data"""
         query = "SELECT max(game_date) as latest_date from game_log;"
-        return self.query_tool.select(query)[0]["latest_date"]
+        latest_date = self.query_tool.select(query)[0]["latest_date"]
+        return latest_date + datetime.timedelta(days=1)
 
     def _get_schedule(self, start_date: Union[str, datetime.date], team: str = None) -> List[Dict[str, str]]:
         """Get the NBA schedule from the provided start date to today
