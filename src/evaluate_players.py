@@ -3,18 +3,18 @@ from src.utils.player_evaluator import PlayerEvaluator
 if __name__ == "__main__":
     weights = {
         'field_goal_percentage': 1.0,
-        'free_throw_percentage': 2.0,
+        'free_throw_percentage': 0.0,
         'three_pointers': 0.0,
-        'points': 0.0,
+        'points': 1.0,
         'rebounds': 1.0,
         'assists': 1.0,
-        'steals': 2.0,
+        'steals': 1.0,
         'blocks': 1.0,
         'turnovers': -1.0
     }
     player_evaluator = PlayerEvaluator(weights=weights)
     players = player_evaluator.evaluate_players(
-        start_date="2023-01-09",
+        start_date="2023-01-31",
         end_date="2023-02-26",
         # use_totals=False
     )
@@ -29,7 +29,10 @@ if __name__ == "__main__":
 
     print("--- My Team ---")
     for player in sorted(my_team, key=lambda x: x["relative_value"], reverse=True):
-        print(f"{player['player_name']}   |   {player['relative_value']}   |   {player['salary']}")
+        print(
+            f"{player['player_name']}   |   {player['relative_value']:.2f}   |   "
+            f"${player['salary']:,}    |    {player['minutes_per_game']:.2f}    |    {player['status'] or ''}"
+        )
 
     for stat in weights.keys():
         totals.setdefault(stat, [])
@@ -45,7 +48,10 @@ if __name__ == "__main__":
             reverse=True
         )
         for player in team:
-            print(f"{player['player_name']}   |   {player['relative_value']}   |   {player['salary']}")
+            print(
+                f"{player['player_name']}   |   {player['relative_value']:.2f}   |   "
+                f"${player['salary']:,}    |    {player['minutes_per_game']:.2f}    |    {player['status'] or ''}"
+            )
 
         for stat in weights.keys():
             totals[stat].append({"manager": manager, "total": sum(p[stat] for p in team)})
@@ -54,7 +60,7 @@ if __name__ == "__main__":
     for stat, values in totals.items():
         print(f"\n--- {stat} ---")
         for value in sorted(values, key=lambda x: x["total"], reverse=True):
-            print(f"{value['manager']}: {value['total']}")
+            print(f"{value['manager']}: {value['total']:.2f}")
 
     print("\n--- Free Agents ---")
     free_agents = sorted(
@@ -63,4 +69,5 @@ if __name__ == "__main__":
         reverse=True
     )
     for player in free_agents[:100]:
-        print(f"{player['player_name']}   |   {player['relative_value']}   |   {player['salary']}    |    {player['status'] or ''}")
+        print(f"{player['player_name']}   |   {player['relative_value']:.2f}   |   "
+              f"${player['salary']:,}    |    {player['minutes_per_game']:.2f}    |    {player['status'] or ''}")
