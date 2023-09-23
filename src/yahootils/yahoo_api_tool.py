@@ -12,7 +12,7 @@ logging.getLogger("yahoo_oauth").setLevel(logging.INFO)
 
 class YahooFantasyApiTool:
     YAHOO_API_URL = "https://fantasysports.yahooapis.com/fantasy/v2"
-    LEAGUE_ID = "29232"
+    LEAGUE_ID = "27633"
 
     def __init__(self):
         self.oauth = OAuth2(None, None, from_file=f"{os.getenv('BBALL_HOME')}/src/yahootils/oauth_keys.json")
