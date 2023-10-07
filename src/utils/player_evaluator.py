@@ -56,7 +56,7 @@ class PlayerEvaluator:
         """
         where_clause = ""
         if start_date and end_date:
-            where_clause = f" WHERE game_log.game_date BETWEEN '{start_date}'::DATE AND '{end_date}'::DATE "
+            where_clause = f" AND game_log.game_date BETWEEN '{start_date}'::DATE AND '{end_date}'::DATE "
         query = (
             "SELECT player_name, team_code, ARRAY_TO_STRING(positions, ',') as positions, status, "
             "AVG(minutes_played) as minutes_per_game, COALESCE(salary, 0) as salary, "
@@ -71,7 +71,7 @@ class PlayerEvaluator:
             "JOIN nba_teams USING (nba_team_id) "
             "LEFT JOIN rosters USING (player_id) "
             "LEFT JOIN teams AS fantasy_teams USING (team_id)"
-            f"{where_clause}"
+            f"WHERE salary > 0 {where_clause}"
             "GROUP BY player_name, team_code, positions, status, salary, fantasy_team, manager;"
         )
         return self.query_tool.select(query)
@@ -89,7 +89,7 @@ class PlayerEvaluator:
         """
         where_clause = ""
         if start_date and end_date:
-            where_clause = f" WHERE game_log.game_date BETWEEN '{start_date}'::DATE AND '{end_date}'::DATE "
+            where_clause = f" AND game_log.game_date BETWEEN '{start_date}'::DATE AND '{end_date}'::DATE "
         query = (
             "SELECT player_name, team_code, ARRAY_TO_STRING(positions, ',') as positions, status, "
             "AVG(minutes_played) as minutes_per_game, COALESCE(salary, 0) as salary, "
@@ -104,7 +104,7 @@ class PlayerEvaluator:
             "JOIN nba_teams USING (nba_team_id) "
             "LEFT JOIN rosters USING (player_id) "
             "LEFT JOIN teams AS fantasy_teams USING (team_id)"
-            f"{where_clause}"
+            f"WHERE salary > 0 {where_clause}"
             "GROUP BY player_name, team_code, positions, status, salary, fantasy_team, manager;"
         )
         return self.query_tool.select(query)
