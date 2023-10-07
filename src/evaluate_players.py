@@ -7,7 +7,7 @@ if __name__ == "__main__":
         'three_pointers': 0.0,
         'points': 1.0,
         'rebounds': 1.0,
-        'assists': 1.0,
+        'assists': 2.0,
         'steals': 1.0,
         'blocks': 1.0,
         'turnovers': -1.0
@@ -62,6 +62,12 @@ if __name__ == "__main__":
         for value in sorted(values, key=lambda x: x["total"], reverse=True):
             print(f"{value['manager']}: {value['total']:.2f}")
 
+    print("\n--- Summary Stats of Player Value ---")
+    from statistics import median
+
+    print("Max: " + str(max(p["relative_value"] for p in free_agents)))
+    print("Median: " + str(median(p["relative_value"] for p in free_agents)))
+
     print("\n--- Free Agents ---")
     free_agents = sorted(
         free_agents,
@@ -69,5 +75,10 @@ if __name__ == "__main__":
         reverse=True
     )
     for player in free_agents[:100]:
+        print(f"{player['player_name']}   |   {player['relative_value']:.2f}   |   "
+              f"${player['salary']:,}    |    {player['minutes_per_game']:.2f}    |    {player['status'] or ''}")
+
+    print("\n--- High Value Players ---")
+    for player in sorted(free_agents, key=lambda x: x["relative_value"] / (x["salary"] / 1_000_000), reverse=True)[:50]:
         print(f"{player['player_name']}   |   {player['relative_value']:.2f}   |   "
               f"${player['salary']:,}    |    {player['minutes_per_game']:.2f}    |    {player['status'] or ''}")
