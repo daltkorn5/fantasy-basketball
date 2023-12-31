@@ -79,12 +79,13 @@ class SpotracScraperTool:
 
         salaries = []
         for row in table_rows:
-            player_name = row.find("h3").text
-            salary_str = row.find("span", {"class": "info"}).text
-            salary = self._convert_salary(salary_str)
-            salaries.append({
-                "player_name": sanitize_player_name(player_name),
-                "salary": salary
-            })
+            if row.find("h3"):
+                player_name = row.find("h3").text
+                salary_str = row.find("span", {"class": "info"}).text
+                salary = self._convert_salary(salary_str)
+                salaries.append({
+                    "player_name": sanitize_player_name(player_name),
+                    "salary": salary
+                })
 
         return salaries

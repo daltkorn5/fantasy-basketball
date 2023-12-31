@@ -148,7 +148,7 @@ class MatchupProjector:
         """
         if not week_no:
             week_no = self._get_week_no()
-        statistics = self._get_player_statistics(week_no, start_date="2023-01-01", end_date="2023-03-01")
+        statistics = self._get_player_statistics(week_no, start_date="2023-10-01", end_date="2023-12-31")
         player_dict = self._make_player_dict(statistics)
         for team, players in player_dict.items():
             print(team)

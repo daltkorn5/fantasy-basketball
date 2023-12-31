@@ -4,19 +4,19 @@ if __name__ == "__main__":
     weights = {
         'field_goal_percentage': 1.0,
         'free_throw_percentage': 0.0,
-        'three_pointers': 0.0,
+        'three_pointers': 1.0,
         'points': 1.0,
         'rebounds': 1.0,
-        'assists': 2.0,
+        'assists': 1.0,
         'steals': 1.0,
         'blocks': 1.0,
         'turnovers': -1.0
     }
     player_evaluator = PlayerEvaluator(weights=weights)
     players = player_evaluator.evaluate_players(
-        start_date="2023-01-31",
-        end_date="2023-02-26",
-        # use_totals=False
+        start_date="2023-11-15",
+        end_date="2023-12-31",
+        use_totals=False
     )
     rosters = {}
     totals = {}
@@ -76,7 +76,8 @@ if __name__ == "__main__":
     )
     for player in free_agents[:100]:
         print(f"{player['player_name']}   |   {player['relative_value']:.2f}   |   "
-              f"${player['salary']:,}    |    {player['minutes_per_game']:.2f}    |    {player['status'] or ''}")
+             f"${player['salary']:,}    |    {player['minutes_per_game']:.2f}    |    {player['status'] or ''}")
+        # print(player)
 
     print("\n--- High Value Players ---")
     for player in sorted(free_agents, key=lambda x: x["relative_value"] / (x["salary"] / 1_000_000), reverse=True)[:50]:
