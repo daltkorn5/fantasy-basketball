@@ -1,6 +1,6 @@
 import datetime
 import time
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Set
 
 import requests
 
@@ -296,41 +296,16 @@ class DataLoader:
         schedule = self.query_tool.select(query, params)
         return schedule
 
-    def _get_game_logs(self, schedule: List[Dict[str, str]]) -> List[Dict[str, Any]]:
-        """Get the game logs from Basketball Reference
-
-        :param schedule: The NBA schedule
-        :return: The game logs for each game in the provided schedule
+    def _load_game_batch(
+            self,
+            game_logs: List[Dict[str, Any]],
+            player_id_map: Dict[str, int]
+    ) -> Set[str]:
         """
-        game_logs = []
-        for row in schedule:
-            print(f"Getting game log for {row}")
-            try:
-                game_log = self.bball_reference_scraper.scrape_game_log(**row)
-                time.sleep(5)
-            except requests.exceptions.ConnectionError:
-                print(f"Game for {row} not found")
-                continue
 
-            game_logs.extend(game_log)
-
-        return game_logs
-
-    def load_game_logs(self, start_date: str = None, team: str = None) -> None:
-        """Get the game log data from Basketball Reference and load it into the DB
-
-        :param start_date: Optional start date for loading the game logs. If not supplied,
-            defaults to the latest date in the `game_log` table
-        :param team: Optional team whose game logs you want
+        :param game_logs:
+        :return:
         """
-        if start_date is None:
-            start_date = self._get_latest_loaded_game_log_date()
-
-        print(f"Loading game logs from {start_date} to today into DB")
-        schedule = self._get_schedule(start_date, team)
-        game_logs = self._get_game_logs(schedule)
-
-        player_id_map = self._get_player_id_map()
         missing_players = set()
         upload = []
         for row in game_logs:
@@ -339,10 +314,6 @@ class DataLoader:
                 missing_players.add(row["player_name"])
             else:
                 upload.append(row)
-
-        print("These players are missing from the DB:")
-        for player in missing_players:
-            print(player)
 
         query = (
             "INSERT INTO game_log(player_id, game_date, minutes_played, field_goals, field_goal_attempts, "
@@ -356,3 +327,54 @@ class DataLoader:
             "turnovers = %(tov)s"
         )
         self.query_tool.insert(query, upload)
+
+        return missing_players
+
+    def _get_game_logs(self, schedule: List[Dict[str, str]], player_id_map: Dict[str, int]) -> Set[str]:
+        """Get the game logs from Basketball Reference
+
+        :param schedule: The NBA schedule
+        :return: The game logs for each game in the provided schedule
+        """
+        game_logs = []
+        games_scraped = 0
+        missing_players = set()
+        for row in schedule:
+            print(f"Getting game log for {row}")
+            try:
+                game_log = self.bball_reference_scraper.scrape_game_log(**row)
+                time.sleep(5)
+            except requests.exceptions.ConnectionError:
+                print(f"Game for {row} not found")
+                continue
+
+            game_logs.extend(game_log)
+            games_scraped += 1
+
+            if games_scraped % 20 == 0:
+                print("Loading batch of games")
+                missing_players.union(self._load_game_batch(game_logs, player_id_map))
+                game_logs = []
+
+        return missing_players
+
+    def load_game_logs(self, start_date: str = None, team: str = None) -> None:
+        """Get the game log data from Basketball Reference and load it into the DB
+
+        :param start_date: Optional start date for loading the game logs. If not supplied,
+            defaults to the latest date in the `game_log` table
+        :param team: Optional team whose game logs you want
+        """
+        if start_date is None:
+            start_date = self._get_latest_loaded_game_log_date()
+
+        print(f"Loading game logs from {start_date} to today into DB")
+        schedule = self._get_schedule(start_date, team)
+        player_id_map = self._get_player_id_map()
+        missing_players = self._get_game_logs(schedule, player_id_map)
+
+        print("These players are missing from the DB:")
+        for player in missing_players:
+            print(player)
+
+
